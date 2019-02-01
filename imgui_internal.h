@@ -86,6 +86,7 @@ struct ImGuiGroupData;              // Stacked storage data for BeginGroup()/End
 struct ImGuiInputTextState;         // Internal state of the currently focused/edited text input box
 struct ImGuiItemHoveredDataBackup;  // Backup and restore IsItemHovered() internal data
 struct ImGuiMenuColumns;            // Simple column measurement, currently used for MenuItem() only
+struct ImGuiMultiSelectState;       // Multi-selection state
 struct ImGuiNavMoveResult;          // Result of a gamepad/keyboard directional navigation move query result
 struct ImGuiNextWindowData;         // Storage for SetNextWindow** functions
 struct ImGuiNextItemData;           // Storage for SetNextItem** functions
@@ -894,6 +895,17 @@ struct ImGuiColumns
     }
 };
 
+struct IMGUI_API ImGuiMultiSelectState
+{
+    ImGuiMultiSelectData    In;                     // The In requests are set and returned by BeginMultiSelect()
+    ImGuiMultiSelectData    Out;                    // The Out requests are finalized and returned by EndMultiSelect()
+    bool                    InRangeDstPassedBy;     // (Internal) set by the the item that match NavJustMovedToId when InRequestRangeSetNav is set.
+    bool                    InRequestSetRangeNav;   // (Internal) set by BeginMultiSelect() when using Shift+Navigation. Because scrolling may be affected we can't afford a frame of lag with Shift+Navigation.
+
+    ImGuiMultiSelectState() { Clear(); }
+    void Clear()            { In.Clear(); Out.Clear(); InRangeDstPassedBy = InRequestSetRangeNav = false; }
+};
+
 // ImDrawList: Helper function to calculate a circle's segment count given its radius and a "maximum error" value.
 #define IM_DRAWLIST_CIRCLE_AUTO_SEGMENT_MIN                     12
 #define IM_DRAWLIST_CIRCLE_AUTO_SEGMENT_MAX                     512
@@ -997,6 +1009,8 @@ struct ImGuiNextItemData
     ImGuiID                     FocusScopeId;   // Set by SetNextItemMultiSelectData() (!= 0 signify value has been set, so it's an alternate version of HasSelectionData, we don't use Flags for this because they are cleared too early. This is mostly used for debugging)
     ImGuiCond                   OpenCond;
     bool                        OpenVal;        // Set by SetNextItemOpen()
+    bool                        MultiSelectDataIsSet;
+    void*                       MultiSelectData;
 
     ImGuiNextItemData()         { memset(this, 0, sizeof(*this)); }
     inline void ClearFlags()    { Flags = ImGuiNextItemDataFlags_None; } // Also cleared manually by ItemAdd()!
@@ -1154,6 +1168,12 @@ struct ImGuiContext
     int                     FocusRequestNextCounterRegular;     // Stored for next frame
     int                     FocusRequestNextCounterTabStop;     // "
     bool                    FocusTabPressed;                    //
+
+    // Range-Select/Multi-Select
+    ImGuiID                 MultiSelectScopeId;
+    ImGuiWindow*            MultiSelectScopeWindow;
+    ImGuiMultiSelectFlags   MultiSelectFlags;
+    ImGuiMultiSelectState   MultiSelectState;
 
     // Render
     ImDrawData              DrawData;                           // Main ImDrawData instance to pass render information to the user
@@ -1322,6 +1342,10 @@ struct ImGuiContext
         FocusRequestCurrCounterRegular = FocusRequestCurrCounterTabStop = INT_MAX;
         FocusRequestNextCounterRegular = FocusRequestNextCounterTabStop = INT_MAX;
         FocusTabPressed = false;
+
+        MultiSelectScopeId = 0;
+        MultiSelectScopeWindow = NULL;
+        MultiSelectFlags = 0;
 
         DimBgRatio = 0.0f;
         BackgroundDrawList._OwnerName = "##Background"; // Give it a name for debugging
@@ -1753,7 +1777,6 @@ namespace ImGui
     IMGUI_API void          PushMultiItemsWidths(int components, float width_full);
     IMGUI_API void          PushItemFlag(ImGuiItemFlags option, bool enabled);
     IMGUI_API void          PopItemFlag();
-    IMGUI_API bool          IsItemToggledSelection();                           // Was the last item selection toggled? (after Selectable(), TreeNode() etc. We only returns toggle _event_ in order to handle clipping correctly)
     IMGUI_API ImVec2        GetContentRegionMaxAbs();
     IMGUI_API void          ShrinkWidths(ImGuiShrinkWidthItem* items, int count, float width_excess);
 
@@ -1817,6 +1840,10 @@ namespace ImGui
     IMGUI_API ImGuiColumns* FindOrCreateColumns(ImGuiWindow* window, ImGuiID id);
     IMGUI_API float         GetColumnOffsetFromNorm(const ImGuiColumns* columns, float offset_norm);
     IMGUI_API float         GetColumnNormFromOffset(const ImGuiColumns* columns, float offset);
+
+    // New Multi-Selection/Range-Selection API (FIXME-WIP)
+    IMGUI_API void          MultiSelectItemHeader(ImGuiID id, bool* p_selected);
+    IMGUI_API void          MultiSelectItemFooter(ImGuiID id, bool* p_selected, bool* p_pressed);
 
     // Tab Bars
     IMGUI_API bool          BeginTabBarEx(ImGuiTabBar* tab_bar, const ImRect& bb, ImGuiTabBarFlags flags);
