@@ -209,6 +209,7 @@ extern IMGUI_API ImGuiContext* GImGui;  // Current implicit context pointer
 // - Helpers: Maths
 // - Helpers: Geometry
 // - Helpers: Bit arrays
+// - Helper: ImBitArray
 // - Helper: ImBitVector
 // - Helper: ImPool<>
 // - Helper: ImChunkStream<>
@@ -374,6 +375,20 @@ inline void          ImBitArraySetBitRange(ImU32* arr, int n, int n2)
         n = (n + 32) & ~31;
     }
 }
+
+// Helper: ImBitArray (wrapper over ImBitArray functions)
+// Store 1-bit per value. NOT CLEARED by constructor.
+template<int BITCOUNT>
+struct IMGUI_API ImBitArray
+{
+    ImU32           Storage[(BITCOUNT + 31) >> 5];
+    ImBitArray()                                { }
+    void            ClearBits()                 { memset(Storage, 0, sizeof(Storage)); }
+    bool            TestBit(int n) const        { IM_ASSERT(n < BITCOUNT); return ImBitArrayTestBit(Storage, n); }
+    void            SetBit(int n)               { IM_ASSERT(n < BITCOUNT); ImBitArraySetBit(Storage, n); }
+    void            ClearBit(int n)             { IM_ASSERT(n < BITCOUNT); ImBitArrayClearBit(Storage, n); }
+    void            SetBitRange(int n1, int n2) { ImBitArraySetBitRange(Storage, n1, n2); }
+};
 
 // Helper: ImBitVector
 // Store 1-bit per value.
@@ -1835,8 +1850,9 @@ namespace ImGui
     IMGUI_API float         GetColumnNormFromOffset(const ImGuiColumns* columns, float offset);
 }
 
-#define IM_COL32_DISABLE            IM_COL32(0,0,0,1)   // Special sentinel code
-#define IMGUI_TABLE_MAX_COLUMNS     64                  // sizeof(ImU64) * 8. This is solely because we frequently encode columns set in a ImU64.
+#define IM_COL32_DISABLE                IM_COL32(0,0,0,1)   // Special sentinel code
+#define IMGUI_TABLE_MAX_COLUMNS         64                  // sizeof(ImU64) * 8. This is solely because we frequently encode columns set in a ImU64.
+#define IMGUI_TABLE_MAX_DRAW_CHANNELS   (2 + 64 * 2)        // See TableUpdateDrawChannels()
 
 // [Internal] sizeof() ~ 100
 struct ImGuiTableColumn
