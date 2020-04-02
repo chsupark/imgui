@@ -1177,6 +1177,7 @@ struct ImGuiContext
     bool                    MultiSelectEnabled;
     ImGuiMultiSelectFlags   MultiSelectFlags;
     ImGuiMultiSelectState   MultiSelectState;                   // We currently don't support recursing/stacking multi-select
+    ImGuiKeyModFlags        MultiSelectKeyMods;
 
     // Render
     ImDrawData              DrawData;                           // Main ImDrawData instance to pass render information to the user
@@ -1349,6 +1350,7 @@ struct ImGuiContext
 
         MultiSelectEnabled = false;
         MultiSelectFlags = ImGuiMultiSelectFlags_None;
+        MultiSelectKeyMods = ImGuiKeyModFlags_None;
 
         DimBgRatio = 0.0f;
         BackgroundDrawList._OwnerName = "##Background"; // Give it a name for debugging
